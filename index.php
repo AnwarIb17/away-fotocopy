@@ -1,274 +1,262 @@
 <?php 
-// 1. Hubungkan ke database dan komponen layout
 include 'config/koneksi.php';
 include 'includes/header.php';
 
-// 2. QUERY HITUNG PENDAPATAN HARI INI
-$query_pendapatan = mysqli_query($koneksi, "SELECT SUM(total_bayar) AS total FROM tb_transaksi WHERE DATE(tanggal_waktu) = CURDATE()");
-$data_pendapatan = mysqli_fetch_assoc($query_pendapatan);
-$pendapatan_hari_ini = $data_pendapatan['total'] ?? 0;
+// Ambil tanggal hari ini
+$hari_ini = date('Y-m-d');
 
-// 3. QUERY HITUNG JUMLAH TRANSAKSI HARI INI
-$query_transaksi = mysqli_query($koneksi, "SELECT COUNT(*) AS total_trx FROM tb_transaksi WHERE DATE(tanggal_waktu) = CURDATE()");
-$data_transaksi = mysqli_fetch_assoc($query_transaksi);
-$trx_hari_ini = $data_transaksi['total_trx'] ?? 0;
+// 1. STATISTIK UTAMA (SEPANJANG MASA)
+$q_atk = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM tb_atk");
+$d_atk = mysqli_fetch_assoc($q_atk);
 
-// 4. QUERY HITUNG ATK YANG STOKNYA MAU HABIS
-$query_stok_tipis = mysqli_query($koneksi, "SELECT COUNT(*) AS total_tipis FROM tb_atk WHERE stok <= 5");
-$data_stok_tipis = mysqli_fetch_assoc($query_stok_tipis);
-$stok_menipis_count = $data_stok_tipis['total_tipis'] ?? 0;
+$q_jasa = mysqli_query($koneksi, "SELECT COUNT(*) as total FROM tb_jasa_fotocopy");
+$d_jasa = mysqli_fetch_assoc($q_jasa);
 
-// 5. QUERY DATA GRAFIK (7 Hari Terakhir)
-$hari = [];
-$omzet = [];
-for ($i = 6; $i >= 0; $i--) {
-    $tgl = date('Y-m-d', strtotime("-$i days"));
-    $label_hari = date('D, d M', strtotime($tgl));
-    
-    $q_grafik = mysqli_query($koneksi, "SELECT SUM(total_bayar) AS total FROM tb_transaksi WHERE DATE(tanggal_waktu) = '$tgl'");
-    $d_grafik = mysqli_fetch_assoc($q_grafik);
-    
-    $hari[] = $label_hari;
-    $omzet[] = $d_grafik['total'] ?? 0;
-}
+$q_omzet = mysqli_query($koneksi, "SELECT SUM(total_bayar) as total FROM tb_transaksi");
+$d_omzet = mysqli_fetch_assoc($q_omzet);
+$total_omzet = $d_omzet['total'] ?? 0;
+
+// 2. PERFORMA HARI INI
+$q_hari_ini = mysqli_query($koneksi, "SELECT COUNT(*) as nota, SUM(total_bayar) as omzet FROM tb_transaksi WHERE DATE(tanggal_waktu) = '$hari_ini'");
+$d_hari_ini = mysqli_fetch_assoc($q_hari_ini);
+$nota_hari_ini = $d_hari_ini['nota'] ?? 0;
+$omzet_hari_ini = $d_hari_ini['omzet'] ?? 0;
+
+// 3. DATA UNTUK GRAFIK PERBANDINGAN ITEM (ATK VS JASA)
+$q_chart_atk = mysqli_query($koneksi, "SELECT SUM(jumlah) as total FROM tb_detail_transaksi WHERE jenis_item = 'atk'");
+$d_chart_atk = mysqli_fetch_assoc($q_chart_atk);
+$total_terjual_atk = $d_chart_atk['total'] ?? 0;
+
+$q_chart_jasa = mysqli_query($koneksi, "SELECT SUM(jumlah) as total FROM tb_detail_transaksi WHERE jenis_item = 'fotocopy'");
+$d_chart_jasa = mysqli_fetch_assoc($q_chart_jasa);
+$total_terjual_jasa = $d_chart_jasa['total'] ?? 0;
 ?>
 
-<!-- Tambahan Google Fonts, Chart.js & Custom CSS -->
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-    body {
-        font-family: 'Plus Jakarta Sans', sans-serif;
-        background-color: #f4f7fa;
+    :root {
+        --dark-blue: #0f172a;
+        --indigo-gradient: linear-gradient(135deg, #6366f1, #4f46e5);
+        --emerald-gradient: linear-gradient(135deg, #10b981, #059669);
+        --amber-gradient: linear-gradient(135deg, #f59e0b, #d97706);
+        --rose-gradient: linear-gradient(135deg, #f43f5e, #e11d48);
     }
-    .custom-card {
+    .card-dashboard {
         border: none;
         border-radius: 16px;
-        transition: all 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
-    .custom-card:hover {
+    .card-dashboard:hover {
         transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0,0,0,0.08) !important;
     }
-    .icon-shape {
-        width: 48px;
-        height: 48px;
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    .text-gradient-purple {
+        background: linear-gradient(135deg, #4f46e5, #0ea5e9);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
     }
-    .btn-quick {
-        border-radius: 12px;
+    .quick-link-btn {
         transition: all 0.2s ease;
         border: 1px solid #e2e8f0;
-        background: #fff;
-        color: #334155;
     }
-    .btn-quick:hover {
-        background: #f8fafc;
+    .quick-link-btn:hover {
+        background-color: #f8fafc !important;
         border-color: #cbd5e1;
         transform: translateX(4px);
-        color: #0f172a;
-    }
-    .table-container {
-        border-radius: 16px;
-        overflow: hidden;
-        background: #fff;
     }
 </style>
 
-<div class="container px-4 py-2">
-    <!-- Judul & Waktu -->
-    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 pb-3 border-bottom">
-        <div>
-            <h1 class="h3 mb-1 text-slate-800 fw-bold" style="color: #1e293b;">Ringkasan Toko</h1>
-            <p class="text-muted small mb-0">Pantau performa harian Away Fotocopy</p>
-        </div>
-        <div class="text-muted small fw-medium mt-2 mt-sm-0 bg-white px-3 py-2 rounded-3 border shadow-sm">
-            <i class="bi bi-calendar3 text-primary me-2"></i><?= date('d F Y'); ?>
-        </div>
-    </div>
-
-    <!-- ROW 1: RANGKUMAN UTAMA (MODERN CARDS) -->
-    <div class="row g-4 mb-4">
-        <div class="col-12 col-md-4">
-            <div class="card custom-card text-white h-100 shadow-sm" style="background: linear-gradient(135deg, #10b981, #059669);">
-                <div class="card-body p-4 d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-white-50 small text-uppercase fw-semibold tracking-wider">Pendapatan Hari Ini</span>
-                        <h2 class="fw-bold mb-0 mt-1" style="font-size: 1.85rem;">Rp <?= number_format($pendapatan_hari_ini, 0, ',', '.'); ?></h2>
-                    </div>
-                    <div class="icon-shape"><i class="bi bi-wallet2 fs-4"></i></div>
+<div class="container-fluid px-4 py-2">
+    <div class="card card-dashboard text-white mb-4 shadow-sm" style="background: linear-gradient(135deg, #1e293b, #0f172a); border-left: 6px solid #38bdf8;">
+        <div class="card-body p-4">
+            <div class="row align-items-center">
+                <div class="col-lg-8">
+                    <span class="badge bg-info text-dark mb-2 fw-bold px-3 py-1.5 rounded-pill text-uppercase" style="font-size: 0.75rem; letter-spacing: 1px;">Live System</span>
+                    <h1 class="fw-bold mb-1" style="letter-spacing: -0.5px;">Dashboard Utama POS</h1>
+                    <p class="text-muted small mb-0">Kelola transaksi, pantau ketersediaan stok ATK, dan rincian omzet Away Fotocopy secara terintegrasi.</p>
                 </div>
-            </div>
-        </div>
-
-        <div class="col-12 col-md-4">
-            <div class="card custom-card text-white h-100 shadow-sm" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);">
-                <div class="card-body p-4 d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-white-50 small text-uppercase fw-semibold tracking-wider">Transaksi Sukses</span>
-                        <h2 class="fw-bold mb-0 mt-1" style="font-size: 1.85rem;"><?= $trx_hari_ini; ?> <span class="fs-5 fw-normal">Nota</span></h2>
-                    </div>
-                    <div class="icon-shape"><i class="bi bi-receipt fs-4"></i></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 col-md-4">
-            <div class="card custom-card text-white h-100 shadow-sm" style="background: linear-gradient(135deg, <?= $stok_menipis_count > 0 ? '#ef4444, #b91c1c' : '#64748b, #475569'; ?>);">
-                <div class="card-body p-4 d-flex align-items-center justify-content-between">
-                    <div>
-                        <span class="text-white-50 small text-uppercase fw-semibold tracking-wider">Stok ATK Menipis</span>
-                        <h2 class="fw-bold mb-0 mt-1" style="font-size: 1.85rem;"><?= $stok_menipis_count; ?> <span class="fs-5 fw-normal">Produk</span></h2>
-                    </div>
-                    <div class="icon-shape"><i class="bi bi-exclamation-triangle fs-4"></i></div>
+                <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
+                    <a href="kasir.php" class="btn btn-info fw-bold text-dark px-4 py-2.5 rounded-3 shadow-sm">
+                        <i class="bi bi-calculator-fill me-2"></i>Mulai Transaksi Kasir
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ROW 2: LINE CHART (GRAFIK TREN PENJUALAN) -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-md-3">
+            <div class="card card-dashboard p-3 bg-white shadow-sm border-start border-emerald border-3" style="border-left: 4px solid #10b981 !important;">
+                <span class="text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Omzet Hari Ini</span>
+                <h4 class="fw-bold text-success mt-1 mb-0">Rp <?= number_format($omzet_hari_ini, 0, ',', '.'); ?></h4>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <div class="card card-dashboard p-3 bg-white shadow-sm" style="border-left: 4px solid #3b82f6 !important;">
+                <span class="text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Nota Hari Ini</span>
+                <h4 class="fw-bold text-primary mt-1 mb-0"><?= $nota_hari_ini; ?> Transaksi</h4>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <div class="card card-dashboard p-3 bg-white shadow-sm" style="border-left: 4px solid #f59e0b !important;">
+                <span class="text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Total Produk ATK</span>
+                <h4 class="fw-bold text-dark mt-1 mb-0"><?= $d_atk['total']; ?> Item</h4>
+            </div>
+        </div>
+        <div class="col-sm-6 col-md-3">
+            <div class="card card-dashboard p-3 bg-white shadow-sm" style="border-left: 4px solid #a855f7 !important;">
+                <span class="text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Total Ragam Jasa</span>
+                <h4 class="fw-bold text-dark mt-1 mb-0"><?= $d_jasa['total']; ?> Layanan</h4>
+            </div>
+        </div>
+    </div>
+
     <div class="row mb-4">
         <div class="col-12">
-            <div class="card custom-card shadow-sm p-4 bg-white">
-                <h5 class="fw-bold mb-3" style="color: #1e293b;"><i class="bi bi-graph-up text-primary me-2"></i>Tren Omzet 7 Hari Terakhir</h5>
-                <div style="height: 280px; position: relative;">
-                    <canvas id="omzetChart"></canvas>
+            <div class="card card-dashboard text-white shadow-sm p-4" style="background: var(--emerald-gradient);">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <span class="small text-white-50 text-uppercase fw-bold tracking-wider" style="font-size: 0.75rem;">Total Pendapatan Akumulatif (Gross Omzet)</span>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 2.5rem; letter-spacing: -1px;">Rp <?= number_format($total_omzet, 0, ',', '.'); ?></h2>
+                    </div>
+                    <div class="bg-white bg-opacity-15 rounded-4 p-3 d-none d-sm-block">
+                        <i class="bi bi-wallet2 fs-1 text-white"></i>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ROW 3: DETAIL TABEL MONITOR & NAVIGASI CEPAT -->
-    <div class="row g-4">
-        <div class="col-12 col-lg-7">
-            <div class="card custom-card table-container shadow-sm">
-                <div class="card-header bg-white py-3 border-0 d-flex align-items-center justify-content-between">
-                    <span class="fw-bold text-danger d-flex align-items-center m-0">
-                        <i class="bi bi-bell-fill me-2"></i> Peringatan Stok (&le; 5)
-                    </span>
-                    <span class="badge bg-danger-subtle text-danger px-2.5 py-1 rounded-pill small fw-semibold">Butuh Belanja</span>
-                </div>
-                <div class="p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0 align-middle">
-                            <thead style="background-color: #f8fafc; border-bottom: 2px solid #edf2f7;">
-                                <tr>
-                                    <th class="ps-4 text-muted small text-uppercase py-3">Nama Barang ATK</th>
-                                    <th class="text-muted small text-uppercase py-3">Sisa Stok</th>
-                                    <th class="text-center text-muted small text-uppercase py-3" style="width: 140px;">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php
-                                $ambil_stok_tipis = mysqli_query($koneksi, "SELECT * FROM tb_atk WHERE stok <= 5 ORDER BY stok ASC");
-                                if (mysqli_num_rows($ambil_stok_tipis) > 0) {
-                                    while ($atk = mysqli_fetch_assoc($ambil_stok_tipis)) {
-                                        echo "<tr style='border-bottom: 1px solid #f1f5f9;'>
-                                                <td class='ps-4 fw-medium text-dark'>" . htmlspecialchars($atk['nama_barang']) . "</td>
-                                                <td><span class='badge bg-danger-subtle text-danger px-3 py-2 rounded-pill fw-bold'>" . $atk['stok'] . " pcs</span></td>
-                                                <td class='text-center pe-3'>
-                                                    <a href='produk-atk.php' class='btn btn-sm btn-primary w-100 rounded-3 fw-medium py-1.5 shadow-sm'>
-                                                        <i class='bi bi-plus-circle me-1'></i> Pasok
-                                                    </a>
-                                                </td>
-                                              </tr>";
-                                    }
-                                } else {
-                                    echo "<tr><td colspan='3' class='text-center text-muted py-5'><i class='bi bi-check-circle-fill text-success fs-3 d-block mb-2'></i> Semua stok ATK di toko aman!</td></tr>";
-                                }
-                                ?>
-                            </tbody>
-                        </table>
-                    </div>
+    <div class="row g-4 mb-4">
+        <div class="col-lg-4">
+            <div class="card card-dashboard shadow-sm bg-white p-4 h-100">
+                <h5 class="fw-bold text-dark mb-3"><i class="bi bi-pie-chart-fill text-indigo me-2"></i>Porsi Penjualan</h5>
+                <div style="position: relative; height: 220px;">
+                    <?php if($total_terjual_atk > 0 || $total_terjual_jasa > 0): ?>
+                        <canvas id="chartPorsi"></canvas>
+                    <?php else: ?>
+                        <div class="text-center text-muted py-5 small"><i class="bi bi-pie-chart d-block fs-2 mb-2"></i>Belum ada data penjualan tercatat.</div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <div class="col-12 col-lg-5">
-            <div class="card custom-card shadow-sm p-4 bg-white">
-                <h5 class="fw-bold mb-3" style="color: #1e293b;"><i class="bi bi-lightning-charge-fill text-warning me-1"></i> Navigasi Pintas</h5>
-                <div class="d-grid gap-2.5">
-                    <a href="kasir.php" class="btn btn-primary btn-lg py-3 fw-bold shadow-sm border-0 d-flex align-items-center justify-content-center" style="background: linear-gradient(135deg, #3b82f6, #2563eb); border-radius: 14px;">
-                        <i class="bi bi-calculator-fill me-2"></i> BUKA LAYAR KASIR
-                    </a>
-                    <a href="produk-atk.php" class="btn btn-quick py-3 text-start px-3 d-flex align-items-center justify-content-between">
-                        <span><i class="bi bi-box-seam text-primary me-2"></i> Kelola Stok & Barang ATK</span>
-                        <i class="bi bi-chevron-right small text-muted"></i>
-                    </a>
-                    <a href="jasa-fotocopy.php" class="btn btn-quick py-3 text-start px-3 d-flex align-items-center justify-content-between">
-                        <span><i class="bi bi-sliders text-success me-2"></i> Atur Tarif Jasa Fotokopi</span>
-                        <i class="bi bi-chevron-right small text-muted"></i>
-                    </a>
-                    <a href="laporan.php" class="btn btn-quick py-3 text-start px-3 d-flex align-items-center justify-content-between">
-                        <span><i class="bi bi-bar-chart-line text-info me-2"></i> Cek Laporan Keuangan</span>
-                        <i class="bi bi-chevron-right small text-muted"></i>
-                    </a>
+        <div class="col-lg-8">
+            <div class="card card-dashboard shadow-sm bg-white p-4 h-100">
+                <h5 class="fw-bold text-dark mb-3"><i class="bi bi-lightning-charge-fill text-warning me-2"></i>Akses Pintas Menu Navigasi</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <a href="produk-atk.php" class="btn btn-light quick-link-btn text-start p-3 rounded-3 d-flex align-items-center justify-content-between bg-white w-100 h-100">
+                            <div>
+                                <strong class="text-dark d-block">Gudang & Stok ATK</strong>
+                                <span class="text-muted small">Kelola ketersediaan barang jualan</span>
+                            </div>
+                            <i class="bi bi-arrow-right-short text-muted fs-4"></i>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <a href="jasa-fotocopy.php" class="btn btn-light quick-link-btn text-start p-3 rounded-3 d-flex align-items-center justify-content-between bg-white w-100 h-100">
+                            <div>
+                                <strong class="text-dark d-block">Tarif Layanan Jasa</strong>
+                                <span class="text-muted small">Atur harga print, copy, & finishing</span>
+                            </div>
+                            <i class="bi bi-arrow-right-short text-muted fs-4"></i>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <a href="laporan.php" class="btn btn-light quick-link-btn text-start p-3 rounded-3 d-flex align-items-center justify-content-between bg-white w-100 h-100">
+                            <div>
+                                <strong class="text-dark d-block">Laporan Keuangan</strong>
+                                <span class="text-muted small">Pantau grafik tren omzet harian</span>
+                            </div>
+                            <i class="bi bi-arrow-right-short text-muted fs-4"></i>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <a href="kasir.php" class="btn btn-light quick-link-btn text-start p-3 rounded-3 d-flex align-items-center justify-content-between bg-white w-100 h-100">
+                            <div>
+                                <strong class="text-dark d-block">Layar Utama Kasir</strong>
+                                <span class="text-muted small">Input item belanjaan pembeli</span>
+                            </div>
+                            <i class="bi bi-arrow-right-short text-muted fs-4"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card card-dashboard shadow-sm bg-white overflow-hidden mb-3">
+        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Kontrol Restock: Peringatan Stok Menipis</h5>
+            <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill px-3 py-1.5 small fw-bold">Ambang Batas &le; 5 Pcs</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light text-secondary small text-uppercase">
+                    <tr>
+                        <th class="ps-4 py-2.5">Nama Barang ATK</th>
+                        <th class="py-2.5">Kode Barcode</th>
+                        <th class="py-2.5 text-center" style="width: 140px;">Sisa Stok Fisik</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php 
+                    $q_kritis = mysqli_query($koneksi, "SELECT * FROM tb_atk WHERE stok <= 5 ORDER BY stok ASC");
+                    if (mysqli_num_rows($q_kritis) > 0) {
+                        while ($k = mysqli_fetch_assoc($q_kritis)) {
+                    ?>
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td class="ps-4 fw-bold text-dark"><?= htmlspecialchars($k['nama_barang']); ?></td>
+                                <td class="text-muted small fw-mono"><?= !empty($k['barcode']) ? htmlspecialchars($k['barcode']) : '-'; ?></td>
+                                <td class="text-center">
+                                    <span class="badge bg-danger text-white rounded-3 py-1.5 px-3 fw-bold d-block">
+                                        <?= $k['stok']; ?> Pcs
+                                    </span>
+                                </td>
+                            </tr>
+                    <?php
+                        }
+                    } else {
+                        echo "<tr><td colspan='3' class='text-center text-muted py-5 small'><i class='bi bi-check-circle-fill text-success d-block fs-2 mb-2'></i>Kondisi Stok Aman! Semua inventaris ATK terisi dengan baik di atas 5 pcs.</td></tr>";
+                    }
+                    ?>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<!-- JAVASCRIPT CONFIGURATION FOR CHART.JS -->
 <script>
-    const ctx = document.getElementById('omzetChart').getContext('2d');
-    
-    // Membuat gradien warna biru transparan di bawah garis grafik
-    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    gradient.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
-    gradient.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
-
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: <?= json_encode($hari); ?>,
-            datasets: [{
-                label: 'Omzet Penjualan (Rp)',
-                data: <?= json_encode($omzet); ?>,
-                borderColor: '#3b82f6',
-                borderWidth: 3,
-                pointBackgroundColor: '#fff',
-                pointBorderColor: '#3b82f6',
-                pointBorderWidth: 2,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                fill: true,
-                backgroundColor: gradient,
-                tension: 0.35 // Membuat garis melengkung smooth halus
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false } // Sembunyikan label kotak atas agar bersih
+document.addEventListener("DOMContentLoaded", function() {
+    var ctx = document.getElementById('chartPorsi');
+    if (ctx) {
+        var myChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Produk ATK', 'Layanan Jasa'],
+                datasets: [{
+                    data: [<?= $total_terjual_atk; ?>, <?= $total_terjual_jasa; ?>],
+                    backgroundColor: ['#6366f1', '#a855f7'],
+                    borderWidth: 2,
+                    hoverOffset: 4
+                }]
             },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    grid: { color: '#f1f5f9' },
-                    ticks: {
-                        callback: function(value) {
-                            return 'Rp ' + value.toLocaleString('id-ID');
-                        },
-                        color: '#64748b',
-                        font: { family: 'Plus Jakarta Sans' }
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, font: { size: 12 } }
                     }
                 },
-                x: {
-                    grid: { display: false },
-                    ticks: { 
-                        color: '#64748b',
-                        font: { family: 'Plus Jakarta Sans' }
-                    }
-                }
+                cutout: '70%' // Membuat grafik donat menjadi lebih tipis dan elegan
             }
-        }
-    });
+        });
+    }
+});
 </script>
 
 <?php include 'includes/footer.php'; ?>
