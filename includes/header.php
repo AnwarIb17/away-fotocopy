@@ -1,3 +1,15 @@
+<?php
+// Memastikan session dimulai sebelum ada output HTML
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Proteksi Halaman: Jika belum login, tendang kembali ke halaman login.php
+if (!isset($_SESSION['login']) || $_SESSION['login'] !== true) {
+    header("Location: login.php");
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -41,8 +53,9 @@
 
 <nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-sm py-2">
     <div class="container-fluid px-4">
-        <a class="navbar-brand fw-bold text-info fs-4" href="index.php">
-            <i class="bi bi-printer-fill me-2"></i>Away Fotocopy
+        <a class="navbar-brand fw-bold text-info fs-4 d-flex align-items-center" href="index.php">
+            <img src="assets/img/logo.png" alt="Logo" width="35" height="35" class="d-inline-block align-top me-2 rounded-2" style="object-fit: cover;">
+            Away Fotocopy
         </a>
         <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
@@ -70,8 +83,19 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link <?= (basename($_SERVER['PHP_SELF']) == 'pengeluaran.php') ? 'active' : ''; ?>" href="pengeluaran.php">
+                        <i class="bi bi-wallet2 me-1"></i> Pengeluaran
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link <?= (basename($_SERVER['PHP_SELF']) == 'laporan.php') ? 'active' : ''; ?>" href="laporan.php">
                         <i class="bi bi-file-earmark-bar-graph-fill me-1"></i> Laporan
+                    </a>
+                </li>
+                <!-- Tombol Keluar / Logout Sistem -->
+                <li class="nav-item">
+                    <a class="nav-link text-danger fw-bold" href="logout.php" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem kasir?')">
+                        <i class="bi bi-box-arrow-right me-1"></i> Keluar
                     </a>
                 </li>
             </ul>

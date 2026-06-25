@@ -17,8 +17,13 @@ $stat = mysqli_fetch_assoc($query_stat);
 $total_nota  = $stat['total_nota'] ?? 0;
 $total_omzet = $stat['total_omzet'] ?? 0;
 
-// 2. LOGIKA MATEMATIS / QUERY UNTUK MENGHITUNG TOTAL LABA BERSIH SECARA DINAMIS
-$total_laba_bersih = 0;
+// 2. HITUNG TOTAL PENGELUARAN TOKO PADA PERIODE INI (FITUR BARU)
+$query_pengeluaran = mysqli_query($koneksi, "SELECT SUM(nominal) as total FROM tb_pengeluaran WHERE tanggal BETWEEN '$tanggal_awal' AND '$tanggal_akhir'");
+$data_pengeluaran = mysqli_fetch_assoc($query_pengeluaran);
+$total_operasional = $data_pengeluaran['total'] ?? 0;
+
+// 3. LOGIKA MATEMATIS / QUERY UNTUK MENGHITUNG TOTAL LABA KOTOR PRODUK (Selesih Jual - Modal HPP)
+$total_laba_produk = 0;
 $query_hitung_laba = mysqli_query($koneksi, "SELECT 
                         dt.jenis_item, dt.id_item, dt.jumlah, dt.subtotal,
                         atk.harga_modal AS modal_atk,
@@ -33,17 +38,20 @@ while ($laba_row = mysqli_fetch_assoc($query_hitung_laba)) {
     $harga_modal_satuan = ($laba_row['jenis_item'] === 'atk') ? $laba_row['modal_atk'] : $laba_row['modal_jasa'];
     $total_modal_item = intval($harga_modal_satuan) * intval($laba_row['jumlah']);
     
-    // Laba per sub-item = Harga Jual Total (Subtotal) - Total Modal Item
     $laba_murni_item = intval($laba_row['subtotal']) - $total_modal_item;
-    $total_laba_bersih += $laba_murni_item;
+    $total_laba_produk += $laba_murni_item;
 }
 
-// 3. AMBIL DATA UNTUK GRAFIK KOMPARASI (Omzet vs Laba Bersih per Hari)
+// LABA BERSIH AKHIR = Laba Kotor Produk - Pengeluaran Operasional Toko
+$total_laba_bersih = $total_laba_produk - $total_operasional;
+
+
+// 4. AMBIL DATA UNTUK GRAFIK KOMPARASI HARIANS
 $label_grafik      = [];
 $data_grafik_omzet = [];
 $data_grafik_laba  = [];
 
-// Buat array tanggal untuk memetakan laba harian secara akurat
+// Buat array tanggal untuk memetakan laba harian produk secara akurat
 $laba_harian_array = [];
 $query_laba_harian = mysqli_query($koneksi, "SELECT 
                         DATE(t.tanggal_waktu) as tgl_hari, dt.jenis_item, dt.jumlah, dt.subtotal,
@@ -65,7 +73,14 @@ while ($lh = mysqli_fetch_assoc($query_laba_harian)) {
     $laba_harian_array[$tgl_key] += $sub_laba;
 }
 
-// Ambil omzet harian dan satukan dengan laba harian untuk disuntikkan ke Chart.js
+// Ambil juga data pengeluaran per hari untuk mengurangi laba harian grafik secara presisi
+$pengeluaran_harian_array = [];
+$query_pengeluaran_harian = mysqli_query($koneksi, "SELECT tanggal, SUM(nominal) as pengeluaran_hari FROM tb_pengeluaran WHERE tanggal BETWEEN '$tanggal_awal' AND '$tanggal_akhir' GROUP BY tanggal");
+while ($ph = mysqli_fetch_assoc($query_pengeluaran_harian)) {
+    $pengeluaran_harian_array[$ph['tanggal']] = $ph['pengeluaran_hari'];
+}
+
+// Ambil omzet harian dan satukan semuanya
 $query_grafik = mysqli_query($koneksi, "SELECT 
                     DATE(tanggal_waktu) as tgl, 
                     SUM(total_bayar) as omzet_harian 
@@ -78,7 +93,11 @@ while ($g = mysqli_fetch_assoc($query_grafik)) {
     $current_tgl = $g['tgl'];
     $label_grafik[] = date('d M', strtotime($current_tgl));
     $data_grafik_omzet[] = $g['omzet_harian'];
-    $data_grafik_laba[]  = $laba_harian_array[$current_tgl] ?? 0;
+    
+    // Laba bersih hari ini = Laba produk hari ini - Pengeluaran hari ini
+    $laba_prod_hari_ini = $laba_harian_array[$current_tgl] ?? 0;
+    $pengeluaran_hari_ini = $pengeluaran_harian_array[$current_tgl] ?? 0;
+    $data_grafik_laba[]  = $laba_prod_hari_ini - $pengeluaran_hari_ini;
 }
 ?>
 
@@ -89,7 +108,7 @@ while ($g = mysqli_fetch_assoc($query_grafik)) {
         --primary-gradient: linear-gradient(135deg, #4f46e5, #3730a3);
         --success-gradient: linear-gradient(135deg, #10b981, #065f46);
         --info-gradient: linear-gradient(135deg, #0ea5e9, #0369a1);
-        --warning-gradient: linear-gradient(135deg, #f59e0b, #b45309);
+        --danger-gradient: linear-gradient(135deg, #f43f5e, #be123c);
     }
     .card-custom {
         border: none;
@@ -103,7 +122,7 @@ while ($g = mysqli_fetch_assoc($query_grafik)) {
     .gradient-primary { background: var(--primary-gradient); }
     .gradient-success { background: var(--success-gradient); }
     .gradient-info { background: var(--info-gradient); }
-    .gradient-warning { background: var(--warning-gradient); }
+    .gradient-danger { background: var(--danger-gradient); }
     
     .table th {
         font-weight: 600;
@@ -149,54 +168,71 @@ while ($g = mysqli_fetch_assoc($query_grafik)) {
         </div>
     </div>
 
-    <div class="row g-4 mb-4">
-        <div class="col-md-4">
-            <div class="card card-custom shadow-sm text-white gradient-info p-3">
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-xl-3">
+            <div class="card card-custom shadow-sm text-white gradient-info p-3 h-100 d-flex flex-column justify-content-between">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem; tracking-wider">Total Omzet (Bruto)</span>
-                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.8rem;">Rp <?= number_format($total_omzet, 0, ',', '.'); ?></h2>
+                        <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Total Omzet (Bruto)</span>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.6rem;">Rp <?= number_format($total_omzet, 0, ',', '.'); ?></h2>
                     </div>
                     <div class="bg-white bg-opacity-15 rounded-4 p-2.5">
-                        <i class="bi bi-wallet2 fs-2 text-white"></i>
+                        <i class="bi bi-wallet2 fs-3 text-white"></i>
                     </div>
                 </div>
                 <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
-                    <i class="bi bi-graph-up me-1"></i> Akumulasi bruto kasir pendapatan toko
+                    <i class="bi bi-graph-up me-1"></i> Pendapatan kotor kasir
                 </div>
             </div>
         </div>
 
-        <div class="col-md-4">
-            <div class="card card-custom shadow-sm text-white gradient-success p-3">
+        <div class="col-md-6 col-xl-3">
+            <div class="card card-custom shadow-sm text-white gradient-danger p-3 h-100 d-flex flex-column justify-content-between">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem; tracking-wider">Estimasi Laba Bersih</span>
-                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.8rem;">Rp <?= number_format($total_laba_bersih, 0, ',', '.'); ?></h2>
+                        <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Pengeluaran Operasional</span>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.6rem;">Rp <?= number_format($total_operasional, 0, ',', '.'); ?></h2>
                     </div>
                     <div class="bg-white bg-opacity-15 rounded-4 p-2.5">
-                        <i class="bi bi-cash-coin fs-2 text-white"></i>
+                        <i class="bi bi-cash-stack fs-3 text-white"></i>
                     </div>
                 </div>
                 <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
-                    <i class="bi bi-check-circle-fill me-1"></i> Keuntungan bersih murni (Sudah potong HPP)
+                    <i class="bi bi-arrow-down-circle me-1"></i> Biaya operasional toko
                 </div>
             </div>
         </div>
 
-        <div class="col-md-4">
-            <div class="card card-custom shadow-sm text-white gradient-primary p-3">
+        <div class="col-md-6 col-xl-3">
+            <div class="card card-custom shadow-sm text-white gradient-success p-3 h-100 d-flex flex-column justify-content-between">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem; tracking-wider">Volume Transaksi</span>
-                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.8rem;"><?= $total_nota; ?> <span style="font-size: 1.1rem; font-weight: normal;">Nota</span></h2>
+                        <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Laba Bersih Akhir</span>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.6rem;">Rp <?= number_format($total_laba_bersih, 0, ',', '.'); ?></h2>
                     </div>
                     <div class="bg-white bg-opacity-15 rounded-4 p-2.5">
-                        <i class="bi bi-journal-check fs-2 text-white"></i>
+                        <i class="bi bi-cash-coin fs-3 text-white"></i>
                     </div>
                 </div>
                 <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
-                    <i class="bi bi-people-fill me-1"></i> Jumlah pelanggan terlayani sukses
+                    <i class="bi bi-check-circle-fill me-1"></i> Sudah dipotong HPP & Biaya Toko
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-xl-3">
+            <div class="card card-custom shadow-sm text-white gradient-primary p-3 h-100 d-flex flex-column justify-content-between">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Volume Transaksi</span>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.6rem;"><?= $total_nota; ?> <span style="font-size: 1rem; font-weight: normal;">Nota</span></h2>
+                    </div>
+                    <div class="bg-white bg-opacity-15 rounded-4 p-2.5">
+                        <i class="bi bi-journal-check fs-3 text-white"></i>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
+                    <i class="bi bi-people-fill me-1"></i> Pelanggan sukses dilayani
                 </div>
             </div>
         </div>
@@ -246,7 +282,6 @@ while ($g = mysqli_fetch_assoc($query_grafik)) {
                             $nota  = isset($row['nomor_nota']) ? $row['nomor_nota'] : ($row['nota_nomor'] ?? '-');
                             $waktu = $row['tanggal_waktu'];
 
-                            // Hitung laba khusus untuk baris transaksi ini saja
                             $laba_nota_ini = 0;
                             $query_laba_nota = mysqli_query($koneksi, "SELECT dt.jenis_item, dt.jumlah, dt.subtotal,
                                                 atk.harga_modal AS modal_atk, jasa.harga_modal AS modal_jasa
@@ -306,7 +341,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         fill: true
                     },
                     {
-                        label: 'Laba Bersih (Rp)',
+                        label: 'Laba Bersih Akhir (Rp)',
                         data: <?php echo json_encode($data_grafik_laba); ?>,
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
                         borderColor: '#10b981',

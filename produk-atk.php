@@ -6,25 +6,49 @@ include 'includes/header.php';
 $search       = isset($_GET['search']) ? mysqli_real_escape_string($koneksi, $_GET['search']) : '';
 $filter_stok  = isset($_GET['filter_stok']) ? mysqli_real_escape_string($koneksi, $_GET['filter_stok']) : 'semua';
 
-// BANGUN QUERY SECARA DINAMIS
+// ================= KONFIGURASI PAGINATION =================
+$batas = 20; // Jumlah data yang ditampilkan per halaman
+$halaman = isset($_GET['p_page']) ? intval($_GET['p_page']) : 1;
+if ($halaman < 1) $halaman = 1;
+$halaman_awal = ($halaman - 1) * $batas;
+// ==========================================================
+
+// BANGUN QUERY SECARA DINAMIS (Untuk data yang akan ditampilkan)
 $query_string = "SELECT * FROM tb_atk WHERE 1=1";
+
+// BANGUN QUERY UNTUK MENGHITUNG TOTAL DATA (Harus sama filternya)
+$query_total_string = "SELECT COUNT(*) AS total FROM tb_atk WHERE 1=1";
 
 // Jika ada kata kunci pencarian (Cari berdasarkan Nama Barang atau Barcode)
 if (!empty($search)) {
-    $query_string .= " AND (nama_barang LIKE '%$search%' OR barcode LIKE '%$search%')";
+    $kondisi_search = " AND (nama_barang LIKE '%$search%' OR barcode LIKE '%$search%')";
+    $query_string .= $kondisi_search;
+    $query_total_string .= $kondisi_search;
 }
 
 // Jika ada filter kondisi stok
 if ($filter_stok === 'habis') {
-    $query_string .= " AND stok = 0";
+    $kondisi_stok = " AND stok = 0";
+    $query_string .= $kondisi_stok;
+    $query_total_string .= $kondisi_stok;
 } elseif ($filter_stok === 'menipis') {
-    $query_string .= " AND stok > 0 AND stok <= 5";
+    $kondisi_stok = " AND stok > 0 AND stok <= 5";
+    $query_string .= $kondisi_stok;
+    $query_total_string .= $kondisi_stok;
 } elseif ($filter_stok === 'aman') {
-    $query_string .= " AND stok > 5";
+    $kondisi_stok = " AND stok > 5";
+    $query_string .= $kondisi_stok;
+    $query_total_string .= $kondisi_stok;
 }
 
-// Urutkan berdasarkan ID terbaru
-$query_string .= " ORDER BY id_atk DESC";
+// Hitung total data berdasarkan filter aktif untuk menentukan jumlah halaman
+$query_hitung = mysqli_query($koneksi, $query_total_string);
+$data_hitung = mysqli_fetch_assoc($query_hitung);
+$total_data = $data_hitung['total'];
+$total_halaman = ceil($total_data / $batas);
+
+// Urutkan berdasarkan ID terbaru DAN BATASI DENGAN LIMIT & OFFSET PAGINATION
+$query_string .= " ORDER BY id_atk DESC LIMIT $halaman_awal, $batas";
 $query = mysqli_query($koneksi, $query_string);
 ?>
 
@@ -248,7 +272,42 @@ $query = mysqli_query($koneksi, $query_string);
                 </tbody>
             </table>
         </div>
-    </div>
+        
+        <?php if ($total_halaman > 1): ?>
+            <div class="card-footer bg-white border-0 py-3 d-flex justify-content-center">
+                <nav>
+                    <ul class="pagination mb-0 gap-1">
+                        <li class="page-item <?= ($halaman <= 1) ? 'disabled' : ''; ?>">
+                            <a class="page-link border-0 rounded-3 text-dark bg-light" href="produk-atk.php?p_page=1&search=<?= urlencode($search); ?>&filter_stok=<?= urlencode($filter_stok); ?>"><i class="bi bi-chevron-double-left"></i></a>
+                        </li>
+                        <li class="page-item <?= ($halaman <= 1) ? 'disabled' : ''; ?>">
+                            <a class="page-link border-0 rounded-3 text-dark bg-light" href="produk-atk.php?p_page=<?= $halaman - 1; ?>&search=<?= urlencode($search); ?>&filter_stok=<?= urlencode($filter_stok); ?>"><i class="bi bi-chevron-left"></i> Prev</a>
+                        </li>
+
+                        <?php 
+                        // Mengatur batas nomor halaman yang tampil (misal hanya memunculkan 3 halaman di sekitar halaman aktif)
+                        $jumlah_nomor = 2; 
+                        $start_number = ($halaman > $jumlah_nomor) ? $halaman - $jumlah_nomor : 1;
+                        $end_number = ($halaman < ($total_halaman - $jumlah_nomor)) ? $halaman + $jumlah_nomor : $total_halaman;
+
+                        for ($x = $start_number; $x <= $end_number; $x++): 
+                        ?>
+                            <li class="page-item <?= ($halaman == $x) ? 'active' : ''; ?>">
+                                <a class="page-link border-0 rounded-3 <?= ($halaman == $x) ? 'bg-primary text-white fw-bold shadow-sm' : 'text-dark bg-light'; ?>" href="produk-atk.php?p_page=<?= $x; ?>&search=<?= urlencode($search); ?>&filter_stok=<?= urlencode($filter_stok); ?>"><?= $x; ?></a>
+                            </li>
+                        <?php endfor; ?>
+
+                        <li class="page-item <?= ($halaman >= $total_halaman) ? 'disabled' : ''; ?>">
+                            <a class="page-link border-0 rounded-3 text-dark bg-light" href="produk-atk.php?p_page=<?= $halaman + 1; ?>&search=<?= urlencode($search); ?>&filter_stok=<?= urlencode($filter_stok); ?>">Next <i class="bi bi-chevron-right"></i></a>
+                        </li>
+                        <li class="page-item <?= ($halaman >= $total_halaman) ? 'disabled' : ''; ?>">
+                            <a class="page-link border-0 rounded-3 text-dark bg-light" href="produk-atk.php?p_page=<?= $total_halaman; ?>&search=<?= urlencode($search); ?>&filter_stok=<?= urlencode($filter_stok); ?>"><i class="bi bi-chevron-double-right"></i></a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        <?php endif; ?>
+        </div>
 </div>
 
 <div class="modal fade" id="modalTambahAtk" tabindex="-1" aria-hidden="true">
