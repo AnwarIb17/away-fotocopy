@@ -16,6 +16,15 @@ $q_omzet = mysqli_query($koneksi, "SELECT SUM(total_bayar) as total FROM tb_tran
 $d_omzet = mysqli_fetch_assoc($q_omzet);
 $total_omzet = $d_omzet['total'] ?? 0;
 
+// --- KALKULASI UANG KAS FISIK SAAT INI ---
+$q_total_pengeluaran = mysqli_query($koneksi, "SELECT SUM(nominal) as total FROM tb_pengeluaran");
+$d_total_pengeluaran = mysqli_fetch_assoc($q_total_pengeluaran);
+$total_pengeluaran = $d_total_pengeluaran['total'] ?? 0;
+
+// Rumus Kas = Semua Omzet Masuk - Semua Pengeluaran Keluar
+$uang_kas_saat_ini = $total_omzet - $total_pengeluaran;
+// ------------------------------------------
+
 // 2. PERFORMA HARI INI
 $q_hari_ini = mysqli_query($koneksi, "SELECT COUNT(*) as nota, SUM(total_bayar) as omzet FROM tb_transaksi WHERE DATE(tanggal_waktu) = '$hari_ini'");
 $d_hari_ini = mysqli_fetch_assoc($q_hari_ini);
@@ -41,6 +50,7 @@ $total_terjual_jasa = $d_chart_jasa['total'] ?? 0;
         --emerald-gradient: linear-gradient(135deg, #10b981, #059669);
         --amber-gradient: linear-gradient(135deg, #f59e0b, #d97706);
         --rose-gradient: linear-gradient(135deg, #f43f5e, #e11d48);
+        --sky-gradient: linear-gradient(135deg, #0ea5e9, #2563eb);
     }
     .card-dashboard {
         border: none;
@@ -68,6 +78,7 @@ $total_terjual_jasa = $d_chart_jasa['total'] ?? 0;
 </style>
 
 <div class="container-fluid px-4 py-2">
+    <!-- Banner Selamat Datang -->
     <div class="card card-dashboard text-white mb-4 shadow-sm" style="background: linear-gradient(135deg, #1e293b, #0f172a); border-left: 6px solid #38bdf8;">
         <div class="card-body p-4">
             <div class="row align-items-center">
@@ -85,9 +96,10 @@ $total_terjual_jasa = $d_chart_jasa['total'] ?? 0;
         </div>
     </div>
 
+    <!-- Statistik Performa Hari Ini -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-md-3">
-            <div class="card card-dashboard p-3 bg-white shadow-sm border-start border-emerald border-3" style="border-left: 4px solid #10b981 !important;">
+            <div class="card card-dashboard p-3 bg-white shadow-sm" style="border-left: 4px solid #10b981 !important;">
                 <span class="text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Omzet Hari Ini</span>
                 <h4 class="fw-bold text-success mt-1 mb-0">Rp <?= number_format($omzet_hari_ini, 0, ',', '.'); ?></h4>
             </div>
@@ -112,22 +124,43 @@ $total_terjual_jasa = $d_chart_jasa['total'] ?? 0;
         </div>
     </div>
 
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card card-dashboard text-white shadow-sm p-4" style="background: var(--emerald-gradient);">
-                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <!-- Informasi Akumulasi: Omzet vs Uang Kas Nyata -->
+    <div class="row g-3 mb-4">
+        <!-- Card Gross Omzet -->
+        <div class="col-md-6">
+            <div class="card card-dashboard text-white shadow-sm p-4 h-100" style="background: var(--emerald-gradient);">
+                <div class="d-flex justify-content-between align-items-center h-100">
                     <div>
                         <span class="small text-white-50 text-uppercase fw-bold tracking-wider" style="font-size: 0.75rem;">Total Pendapatan Akumulatif (Gross Omzet)</span>
-                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 2.5rem; letter-spacing: -1px;">Rp <?= number_format($total_omzet, 0, ',', '.'); ?></h2>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 2.2rem; letter-spacing: -1px;">Rp <?= number_format($total_omzet, 0, ',', '.'); ?></h2>
                     </div>
                     <div class="bg-white bg-opacity-15 rounded-4 p-3 d-none d-sm-block">
-                        <i class="bi bi-wallet2 fs-1 text-white"></i>
+                        <i class="bi bi-graph-up-arrow fs-2 text-white"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Card Saldo Uang Kas Fisik Toko -->
+        <div class="col-md-6">
+            <!-- Warnanya otomatis berubah jadi merah marun (rose) kalau kasnya sampai minus akibat pengeluaran besar -->
+            <div class="card card-dashboard text-white shadow-sm p-4 h-100" style="background: <?= ($uang_kas_saat_ini < 0) ? 'var(--rose-gradient)' : 'var(--sky-gradient)'; ?>;">
+                <div class="d-flex justify-content-between align-items-center h-100">
+                    <div>
+                        <span class="small text-white-50 text-uppercase fw-bold tracking-wider" style="font-size: 0.75rem;">Estimasi Uang Kas Saat Ini (Di Laci Toko)</span>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 2.2rem; letter-spacing: -1px;">
+                            Rp <?= number_format($uang_kas_saat_ini, 0, ',', '.'); ?>
+                        </h2>
+                    </div>
+                    <div class="bg-white bg-opacity-15 rounded-4 p-3 d-none d-sm-block">
+                        <i class="bi <?= ($uang_kas_saat_ini < 0) ? 'bi-exclamation-octagon' : 'bi-cash-coin'; ?> fs-2 text-white"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Navigasi Pintas & Grafik -->
     <div class="row g-4 mb-4">
         <div class="col-lg-4">
             <div class="card card-dashboard shadow-sm bg-white p-4 h-100">
@@ -174,10 +207,10 @@ $total_terjual_jasa = $d_chart_jasa['total'] ?? 0;
                         </a>
                     </div>
                     <div class="col-md-6">
-                        <a href="kasir.php" class="btn btn-light quick-link-btn text-start p-3 rounded-3 d-flex align-items-center justify-content-between bg-white w-100 h-100">
+                        <a href="pengeluaran.php" class="btn btn-light quick-link-btn text-start p-3 rounded-3 d-flex align-items-center justify-content-between bg-white w-100 h-100">
                             <div>
-                                <strong class="text-dark d-block">Layar Utama Kasir</strong>
-                                <span class="text-muted small">Input item belanjaan pembeli</span>
+                                <strong class="text-dark d-block">Pengeluaran Toko</strong>
+                                <span class="text-muted small">Catat pengeluaran operasional & restock</span>
                             </div>
                             <i class="bi bi-arrow-right-short text-muted fs-4"></i>
                         </a>
@@ -187,6 +220,7 @@ $total_terjual_jasa = $d_chart_jasa['total'] ?? 0;
         </div>
     </div>
 
+    <!-- Peringatan Stok Menipis -->
     <div class="card card-dashboard shadow-sm bg-white overflow-hidden mb-3">
         <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
             <h5 class="fw-bold text-dark mb-0"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>Kontrol Restock: Peringatan Stok Menipis</h5>
@@ -252,7 +286,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         labels: { boxWidth: 12, font: { size: 12 } }
                     }
                 },
-                cutout: '70%' // Membuat grafik donat menjadi lebih tipis dan elegan
+                cutout: '70%'
             }
         });
     }
