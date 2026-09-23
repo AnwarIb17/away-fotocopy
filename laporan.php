@@ -158,6 +158,10 @@ foreach ($date_range as $date) {
             <h1 class="h3 mb-1 text-dark fw-bold">Ringkasan Eksekutif Keuangan</h1>
             <p class="text-muted small mb-0"><i class="bi bi-calendar3 me-1"></i> Periode Aktif: <span class="fw-semibold text-dark"><?= date('d M Y', strtotime($tanggal_awal)); ?></span> s/d <span class="fw-semibold text-dark"><?= date('d M Y', strtotime($tanggal_akhir)); ?></span></p>
         </div>
+        <div class="d-flex gap-2">
+            <a href="proses/export-csv.php?jenis=transaksi&tanggal_awal=<?=$tanggal_awal?>&tanggal_akhir=<?=$tanggal_akhir?>" class="btn btn-success fw-bold"><i class="bi bi-file-earmark-excel me-1"></i> Export Transaksi CSV</a>
+            <a href="proses/export-csv.php?jenis=pengeluaran&tanggal_awal=<?=$tanggal_awal?>&tanggal_akhir=<?=$tanggal_akhir?>" class="btn btn-outline-success fw-bold"><i class="bi bi-wallet2 me-1"></i> Export Pengeluaran</a>
+        </div>
     </div>
 
     <!-- Panel Filter Tanggal -->

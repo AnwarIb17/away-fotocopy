@@ -1,13 +1,12 @@
 <?php 
 include 'config/koneksi.php';
 include 'includes/header.php';
-
-// Generate Nomor Nota Otomatis (Format: NOTA-YYYYMMDD-ID)
 $hari_ini = date('Ymd');
 $query_nota = mysqli_query($koneksi, "SELECT MAX(id_transaksi) AS last_id FROM tb_transaksi");
 $data_nota = mysqli_fetch_assoc($query_nota);
 $next_id = ($data_nota['last_id'] ?? 0) + 1;
 $nomor_nota = "TRX-" . $hari_ini . "-" . str_pad($next_id, 4, "0", STR_PAD_LEFT);
+$q_pel = mysqli_query($koneksi, "SELECT * FROM tb_pelanggan ORDER BY nama ASC");
 ?>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
@@ -126,14 +125,32 @@ $nomor_nota = "TRX-" . $hari_ini . "-" . str_pad($next_id, 4, "0", STR_PAD_LEFT)
                     <input type="hidden" id="submit-total" name="total_bayar" value="0">
                     <input type="hidden" id="submit-json-items" name="json_items">
 
-                    <div class="mb-3">
-                        <label class="form-label text-white-50 small">Uang Tunai Diterima (Rp)</label>
+                    <div class="mb-2">
+                        <label class="form-label text-white-50 small">Metode Bayar</label>
+                        <select name="metode_bayar" id="select-metode" class="form-select fw-bold" onchange="gantiMetode()">
+                            <option value="tunai">Tunai</option>
+                            <option value="transfer">Transfer / QRIS</option>
+                            <option value="piutang">Piutang / Bon</option>
+                        </select>
+                    </div>
+                    <div class="mb-2 d-none" id="wrap-pelanggan">
+                        <label class="form-label text-white-50 small">Pelanggan (wajib bon)</label>
+                        <select name="pelanggan_id" id="select-pelanggan" class="form-select">
+                            <option value="0">-- pilih pelanggan --</option>
+                            <?php while($p=mysqli_fetch_assoc($q_pel)): ?><option value="<?=$p['id_pelanggan']?>"><?=htmlspecialchars($p['nama'])?></option><?php endwhile; ?>
+                        </select>
+                        <a href="piutang.php" class="small text-info">+ pelanggan baru</a>
+                    </div>
+
+                    <div class="mb-3" id="wrap-tunai">
+                        <label class="form-label text-white-50 small">Uang Diterima (Rp) / DP jika bon</label>
                         <input type="number" id="input-tunai" name="nominal_tunai" class="form-control form-control-lg bg-secondary text-white border-0 fw-bold fs-4 rounded-3" required min="0" placeholder="0">
                     </div>
 
                     <div class="mb-4 p-3 rounded-3" style="background: rgba(255,255,255,0.06);">
-                        <span class="text-white-50 small d-block">Uang Kembalian</span>
+                        <span class="text-white-50 small d-block" id="label-kembalian">Uang Kembalian</span>
                         <h3 class="fw-bold text-warning mb-0" id="display-kembalian">Rp 0</h3>
+                        <small id="info-piutang" class="text-white-50 d-none">Sisa piutang akan tercatat otomatis.</small>
                         <input type="hidden" id="submit-kembalian" name="kembalian" value="0">
                     </div>
 
@@ -395,26 +412,49 @@ $nomor_nota = "TRX-" . $hari_ini . "-" . str_pad($next_id, 4, "0", STR_PAD_LEFT)
     }
 
     // 4. ENGINE KALKULATOR KEMBALIAN & VALIDASI TOMBOL SIMPAN
+    function gantiMetode(){
+        const m=$('#select-metode').val();
+        if(m==='piutang'){
+            $('#wrap-pelanggan').removeClass('d-none');
+            $('#label-kembalian').text('Sisa Piutang (otomatis)');
+            $('#info-piutang').removeClass('d-none');
+        } else {
+            $('#wrap-pelanggan').addClass('d-none');
+            $('#label-kembalian').text('Uang Kembalian');
+            $('#info-piutang').addClass('d-none');
+        }
+        let total = parseInt($('#submit-total').val()) || 0;
+        hitungPembayaran(total);
+    }
     function hitungPembayaran(total) {
+        const metode = $('#select-metode').val();
         $('#submit-total').val(total);
         $('#display-total').text('Rp ' + total.toLocaleString('id-ID'));
         $('#submit-json-items').val(JSON.stringify(keranjang));
 
         let uangTunai = parseInt($('#input-tunai').val()) || 0;
-        let kembalian = uangTunai - total;
-
-        if (total > 0 && uangTunai >= total) {
-            $('#display-kembalian').text('Rp ' + kembalian.toLocaleString('id-ID'));
-            $('#submit-kembalian').val(kembalian);
-            $('#btn-simpan').prop('disabled', false);
-        } else {
-            $('#display-kembalian').text('Rp 0');
+        if(metode==='piutang'){
+            let sisa = Math.max(0, total - uangTunai);
+            $('#display-kembalian').text('Rp ' + sisa.toLocaleString('id-ID'));
             $('#submit-kembalian').val(0);
-            $('#btn-simpan').prop('disabled', true);
+            const valid = total>0 && (parseInt($('#select-pelanggan').val())>0) && keranjang.length>0;
+            $('#btn-simpan').prop('disabled', !valid);
+            if(total===0) $('#display-kembalian').text('Rp 0');
+        } else {
+            let kembalian = uangTunai - total;
+            if (total > 0 && uangTunai >= total) {
+                $('#display-kembalian').text('Rp ' + kembalian.toLocaleString('id-ID'));
+                $('#submit-kembalian').val(kembalian);
+                $('#btn-simpan').prop('disabled', false);
+            } else {
+                $('#display-kembalian').text('Rp 0');
+                $('#submit-kembalian').val(0);
+                $('#btn-simpan').prop('disabled', true);
+            }
         }
     }
 
-    $('#input-tunai').on('input', function() {
+    $('#input-tunai, #select-pelanggan').on('input change', function() {
         let total = parseInt($('#submit-total').val()) || 0;
         hitungPembayaran(total);
     });

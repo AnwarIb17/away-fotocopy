@@ -68,6 +68,16 @@ if (!isset($_SESSION['login']) || $_SESSION['login'] !== true) {
                 </li>
                 <!-- Tombol Keluar / Logout Sistem -->
                 <li class="nav-item">
+                    <a class="nav-link <?= (basename($_SERVER['PHP_SELF']) == 'tutup-kasir.php') ? 'active' : ''; ?>" href="tutup-kasir.php">
+                        <i class="bi bi-safe-fill me-1"></i> Tutup Kasir
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <?= (basename($_SERVER['PHP_SELF']) == 'piutang.php') ? 'active' : ''; ?>" href="piutang.php">
+                        <i class="bi bi-journal-bookmark-fill me-1"></i> Piutang
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link text-danger fw-bold" href="logout.php" onclick="return confirm('Apakah Anda yakin ingin keluar dari sistem kasir?')">
                         <i class="bi bi-box-arrow-right me-1"></i> Keluar
                     </a>

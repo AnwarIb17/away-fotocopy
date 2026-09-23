@@ -3,18 +3,28 @@ session_start();
 include '../config/koneksi.php';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Menyesuaikan input dengan database Anda
     $nomor_nota     = mysqli_real_escape_string($koneksi, $_POST['nota_nomor']);
     $total_bayar    = intval($_POST['total_bayar']);
     $nominal_tunai  = intval($_POST['nominal_tunai']);
     $kembalian      = intval($_POST['kembalian']);
-    $json_items     = $_POST['json_items']; 
-
-    // Validasi data dasar
-    if (empty($json_items) || $total_bayar <= 0 || $nominal_tunai < $total_bayar) {
-        header("Location: ../kasir.php?status=gagal_input");
-        exit();
+    $json_items     = $_POST['json_items'];
+    $metode_bayar   = mysqli_real_escape_string($koneksi, $_POST['metode_bayar'] ?? 'tunai');
+    $pelanggan_id   = intval($_POST['pelanggan_id'] ?? 0); if($pelanggan_id<=0) $pelanggan_id=null;
+    $sisa_piutang   = 0; $status_bayar='lunas'; $run_nominal=$nominal_tunai; $run_kembalian=$kembalian;
+    if(in_array($metode_bayar,['piutang','bon'])){
+        $metode_bayar='piutang';
+        if(!$pelanggan_id){ header("Location: ../kasir.php?status=pelanggan_wajib"); exit(); }
+        // izinkan DP: sisa = total - tunai
+        $sisa_piutang = max(0, $total_bayar - $nominal_tunai);
+        $status_bayar = $sisa_piutang>0 ? 'belum_lunas' : 'lunas';
+        $run_kembalian = 0; // piutang tidak ada kembalian
+        if($nominal_tunai > $total_bayar) $nominal_tunai = $total_bayar;
+    } else {
+        if(empty($json_items) || $total_bayar <= 0 || $nominal_tunai < $total_bayar){
+            header("Location: ../kasir.php?status=gagal_input"); exit();
+        }
     }
+    if(empty($json_items) || $total_bayar <= 0){ header("Location: ../kasir.php?status=gagal_input"); exit(); }
 
     $items = json_decode($json_items, true);
     if (!is_array($items)) {
@@ -56,14 +66,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         ];
     }
 
-    // 1. INSERT UTAMA KE TABEL `tb_transaksi` (Sesuai kolom database Anda)
-    // Query ini menggunakan klausa fleksibel untuk mendukung penamaan kolom Anda
-    $query_transaksi = "INSERT INTO tb_transaksi (nomor_nota, total_bayar, nominal_tunai, kembalian) 
-                        VALUES ('$nomor_nota', $total_bayar, $nominal_tunai, $kembalian)";
+    // 1. INSERT UTAMA — kolom baru: metode_bayar, status_bayar, pelanggan_id, sisa_piutang
+    $pel_col = $pelanggan_id ? $pelanggan_id : "NULL";
+    $query_transaksi = "INSERT INTO tb_transaksi (nomor_nota, nota_nomor, total_bayar, nominal_tunai, kembalian, metode_bayar, status_bayar, pelanggan_id, sisa_piutang)
+                        VALUES ('$nomor_nota', '$nomor_nota', $total_bayar, $run_nominal, $run_kembalian, '$metode_bayar', '$status_bayar', $pel_col, $sisa_piutang)";
     
     // Jika kolom di database Anda adalah nota_nomor, kita fallback ke query alternatif apabila query pertama gagal
     if (!mysqli_query($koneksi, $query_transaksi)) {
-        $query_transaksi = "INSERT INTO tb_transaksi (nota_nomor, total_bayar, nominal_tunai, kembalian) 
+        // fallback legacy tanpa kolom baru — biar DB lama tetap jalan
+        $query_transaksi = "INSERT INTO tb_transaksi (nomor_nota, total_bayar, nominal_tunai, kembalian) 
                             VALUES ('$nomor_nota', $total_bayar, $nominal_tunai, $kembalian)";
         $run_query = mysqli_query($koneksi, $query_transaksi);
     } else {
