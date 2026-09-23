@@ -1,0 +1,71 @@
+/* Glassmorphism theme — 1 file untuk seluruh POS. ponytail: ceiling = light-glass di atas gradient mesh; upgrade = dark-mode toggle + token CSS per-warna bila butuh. */
+body{
+  font-family:'Plus Jakarta Sans',sans-serif;
+  color:#1e293b;
+  min-height:100vh;
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 35%,#0ea5e9 75%,#38bdf8 100%);
+  background-attachment:fixed;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;
+  background:
+    radial-gradient(600px 400px at 10% 10%,rgba(255,255,255,.35),transparent 60%),
+    radial-gradient(700px 500px at 90% 20%,rgba(240,171,252,.5),transparent 60%),
+    radial-gradient(800px 600px at 50% 100%,rgba(45,212,191,.4),transparent 60%);
+}
+main{position:relative;z-index:1}
+
+/* Navbar: dark frosted */
+.navbar{background:rgba(15,23,42,.55)!important;backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);border-bottom:1px solid rgba(255,255,255,.18)}
+.nav-link{color:rgba(255,255,255,.7)!important}
+.nav-link:hover{color:#fff!important;background:rgba(255,255,255,.12)}
+.nav-link.active{color:#7dd3fc!important;background:rgba(255,255,255,.14)!important}
+
+/* Cards: light frosted — override bg-white; panel kasir bg-dark dibiarkan */
+.card,.card-dashboard,.card-custom,.cart-card{
+  background:rgba(255,255,255,.55)!important;
+  backdrop-filter:blur(20px) saturate(170%);
+  -webkit-backdrop-filter:blur(20px) saturate(170%);
+  border:1px solid rgba(255,255,255,.65)!important;
+  border-radius:18px!important;
+  box-shadow:0 8px 32px rgba(31,38,135,.18)!important;
+}
+.login-card{background:rgba(255,255,255,.62)!important;backdrop-filter:blur(20px) saturate(170%);-webkit-backdrop-filter:blur(20px) saturate(170%);border:1px solid rgba(255,255,255,.65)!important;border-radius:18px!important;box-shadow:0 8px 32px rgba(31,38,135,.2)!important}
+.cart-card.bg-dark,.card.bg-dark{background:rgba(15,23,42,.62)!important;backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border:1px solid rgba(255,255,255,.18)!important}
+.card-dashboard:hover{transform:translateY(-4px)}
+.card-header,.card-footer{background:transparent!important;border-color:rgba(15,23,42,.08)!important}
+.text-white-50{color:rgba(255,255,255,.8)!important}
+
+/* Gradient stat cards tetap nge-glass */
+[style*="var(--"],[style*="linear-gradient"]{border:1px solid rgba(255,255,255,.4)!important}
+
+/* Tables */
+.table{--bs-table-bg:transparent}
+.table thead th{background:rgba(255,255,255,.45)!important;border-bottom:1px solid rgba(255,255,255,.5)!important}
+.table tbody tr{border-bottom:1px solid rgba(15,23,42,.06)!important}
+.table tbody tr:hover{background:rgba(255,255,255,.45)!important}
+
+/* Forms */
+.form-control,.form-select{background:rgba(255,255,255,.75)!important;border:1px solid rgba(255,255,255,.7)!important;backdrop-filter:blur(8px)}
+.form-control:focus,.form-select:focus{background:rgba(255,255,255,.95)!important;border-color:#38bdf8;box-shadow:0 0 0 .25rem rgba(56,189,248,.25)}
+.input-group-text{background:rgba(255,255,255,.6)!important;border:1px solid rgba(255,255,255,.6)!important;backdrop-filter:blur(8px)}
+
+/* Modals, dropdowns, search results */
+.modal-content{background:rgba(255,255,255,.78)!important;backdrop-filter:blur(24px) saturate(170%);border:1px solid rgba(255,255,255,.6)!important;border-radius:20px!important}
+.search-results{background:rgba(255,255,255,.85);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.6)}
+.list-group-item{background:rgba(255,255,255,.7)!important}
+
+/* Buttons: kaca + gradient tetap */
+.btn{backdrop-filter:blur(6px)}
+.btn-primary{background:linear-gradient(135deg,rgba(99,102,241,.9),rgba(59,130,246,.9))!important;border:1px solid rgba(255,255,255,.35)!important}
+.quick-link-btn{background:rgba(255,255,255,.5)!important;border:1px solid rgba(255,255,255,.6)!important}
+.quick-link-btn:hover{background:rgba(255,255,255,.85)!important}
+
+/* Footer */
+.footer{background:rgba(255,255,255,.4)!important;backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,.5)!important}
+
+/* Alerts & badges di atas kaca */
+.alert{backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.5)}
+
+/* Mobile cart item */
+.mobile-cart-item{background:rgba(255,255,255,.65)!important;backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.6)!important}

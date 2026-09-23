@@ -48,6 +48,7 @@ if (!isset($_SESSION['login']) || $_SESSION['login'] !== true) {
             font-weight: 600;
         }
     </style>
+    <link href="assets/css/glass.css" rel="stylesheet">
 </head>
 <body>
 

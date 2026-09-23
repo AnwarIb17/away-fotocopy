@@ -18,10 +18,14 @@ $total_nota  = $stat['total_nota'] ?? 0;
 $total_omzet = $stat['total_omzet'] ?? 0;
 
 // 2. HITUNG TOTAL PENGELUARAN OPERASIONAL TOKO PADA PERIODE INI
-// [FIX LOGIC]: Menambahkan penyaringan 'AND kategori != "belanja_stok"' agar tidak terjadi double counting dengan HPP Kasir
-$query_pengeluaran = mysqli_query($koneksi, "SELECT SUM(nominal) as total FROM tb_pengeluaran WHERE tanggal BETWEEN '$tanggal_awal' AND '$tanggal_akhir' AND kategori != 'belanja_stok'");
+$query_pengeluaran = mysqli_query($koneksi, "SELECT SUM(nominal) as total FROM tb_pengeluaran WHERE DATE(tanggal) BETWEEN '$tanggal_awal' AND '$tanggal_akhir' AND kategori = 'operasional'");
 $data_pengeluaran = mysqli_fetch_assoc($query_pengeluaran);
 $total_operasional = $data_pengeluaran['total'] ?? 0;
+
+// [TAMBAHAN]: HITUNG TOTAL BELANJA STOK / MODAL UNTUK CARD BARU
+$query_belanja = mysqli_query($koneksi, "SELECT SUM(nominal) as total FROM tb_pengeluaran WHERE DATE(tanggal) BETWEEN '$tanggal_awal' AND '$tanggal_akhir' AND kategori = 'belanja_stok'");
+$data_belanja = mysqli_fetch_assoc($query_belanja);
+$total_belanja_stok = $data_belanja['total'] ?? 0;
 
 // 3. MENGHITUNG TOTAL LABA KOTOR PRODUK (Selisih Jual - Modal HPP)
 $total_laba_produk = 0;
@@ -46,14 +50,22 @@ while ($laba_row = mysqli_fetch_assoc($query_hitung_laba)) {
 // LABA BERSIH AKHIR = Laba Kotor Jual Produk - Pengeluaran Operasional Toko
 $total_laba_bersih = $total_laba_produk - $total_operasional;
 
-// 4. AMBIL DATA UNTUK GRAFIK KOMPARASI HARIAN (3 JALUR DATA)
+
+// 4. AMBIL DATA UNTUK GRAFIK KOMPARASI HARIAN (BERDASARKAN DERET KALENDER KALKULASI)
 $label_grafik            = [];
 $data_grafik_omzet       = [];
 $data_grafik_pengeluaran = [];
 $data_grafik_laba        = [];
 
-// Array pembantu untuk memetakan laba kotor produk per hari
-$laba_harian_array = [];
+// Array pembantu 1: Map Omzet Penjualan Harian
+$omzet_harian_map = [];
+$query_omzet_harian = mysqli_query($koneksi, "SELECT DATE(tanggal_waktu) as tgl, SUM(total_bayar) as total FROM tb_transaksi WHERE DATE(tanggal_waktu) BETWEEN '$tanggal_awal' AND '$tanggal_akhir' GROUP BY DATE(tanggal_waktu)");
+while ($oh = mysqli_fetch_assoc($query_omzet_harian)) {
+    $omzet_harian_map[$oh['tgl']] = intval($oh['total']);
+}
+
+// Array pembantu 2: Map Laba Kotor Jual Produk Harian
+$laba_harian_map = [];
 $query_laba_harian = mysqli_query($koneksi, "SELECT 
                         DATE(t.tanggal_waktu) as tgl_hari, dt.jenis_item, dt.jumlah, dt.subtotal,
                         atk.harga_modal AS modal_atk, jasa.harga_modal AS modal_jasa
@@ -62,45 +74,44 @@ $query_laba_harian = mysqli_query($koneksi, "SELECT
                         LEFT JOIN tb_atk atk ON dt.jenis_item = 'atk' AND dt.id_item = atk.id_atk
                         LEFT JOIN tb_jasa_fotocopy jasa ON dt.jenis_item = 'fotocopy' AND dt.id_item = jasa.id_jasa
                         WHERE DATE(t.tanggal_waktu) BETWEEN '$tanggal_awal' AND '$tanggal_akhir'");
-
 while ($lh = mysqli_fetch_assoc($query_laba_harian)) {
     $tgl_key = $lh['tgl_hari'];
     $h_modal = ($lh['jenis_item'] === 'atk') ? $lh['modal_atk'] : $lh['modal_jasa'];
     $sub_laba = intval($lh['subtotal']) - (intval($h_modal) * intval($lh['jumlah']));
     
-    if(!isset($laba_harian_array[$tgl_key])) {
-        $laba_harian_array[$tgl_key] = 0;
+    if(!isset($laba_harian_map[$tgl_key])) {
+        $laba_harian_map[$tgl_key] = 0;
     }
-    $laba_harian_array[$tgl_key] += $sub_laba;
+    $laba_harian_map[$tgl_key] += $sub_laba;
 }
 
-// Array pembantu untuk memetakan pengeluaran harian toko
-// [FIX LOGIC]: Pada grafik, kita juga menyaring agar biaya belanja stok tidak ikut ditarik sebagai pengeluaran yang memotong laba harian
-$pengeluaran_harian_array = [];
-$query_pengeluaran_harian = mysqli_query($koneksi, "SELECT tanggal, SUM(nominal) as pengeluaran_hari FROM tb_pengeluaran WHERE tanggal BETWEEN '$tanggal_awal' AND '$tanggal_akhir' AND kategori != 'belanja_stok' GROUP BY tanggal");
+// Array pembantu 3: Map Pengeluaran Operasional Harian Toko (Dipaksa sanitasi DATE agar format string sinkron)
+$pengeluaran_harian_map = [];
+$query_pengeluaran_harian = mysqli_query($koneksi, "SELECT DATE(tanggal) as tgl_keluar, SUM(nominal) as pengeluaran_hari FROM tb_pengeluaran WHERE DATE(tanggal) BETWEEN '$tanggal_awal' AND '$tanggal_akhir' AND kategori = 'operasional' GROUP BY DATE(tanggal)");
 while ($ph = mysqli_fetch_assoc($query_pengeluaran_harian)) {
-    $pengeluaran_harian_array[$ph['tanggal']] = $ph['pengeluaran_hari'];
+    $pengeluaran_harian_map[$ph['tgl_keluar']] = intval($ph['pengeluaran_hari']);
 }
 
-// Query dasar penentu tanggal (Omzet Harian)
-$query_grafik = mysqli_query($koneksi, "SELECT 
-                    DATE(tanggal_waktu) as tgl, 
-                    SUM(total_bayar) as omzet_harian 
-                    FROM tb_transaksi 
-                    WHERE DATE(tanggal_waktu) BETWEEN '$tanggal_awal' AND '$tanggal_akhir'
-                    GROUP BY DATE(tanggal_waktu)
-                    ORDER BY DATE(tanggal_waktu) ASC");
+// PROSES DISTRIBUSI DATA KE SUMBU X GRAFIK BERDASARKAN KALENDER RIIL
+$start_date = new DateTime($tanggal_awal);
+$end_date   = new DateTime($tanggal_akhir);
+$end_date->modify('+1 day'); // Memasukkan hari terakhir ke dalam loop interval
+$interval   = new DateInterval('P1D');
+$date_range = new DatePeriod($start_date, $interval, $end_date);
 
-while ($g = mysqli_fetch_assoc($query_grafik)) {
-    $current_tgl = $g['tgl'];
-    $label_grafik[] = date('d M', strtotime($current_tgl));
-    $data_grafik_omzet[] = $g['omzet_harian'];
+foreach ($date_range as $date) {
+    $current_tgl = $date->format('Y-m-d');
     
-    // Ambil data dari array pembantu
-    $laba_prod_hari_ini = $laba_harian_array[$current_tgl] ?? 0;
-    $pengeluaran_hari_ini = $pengeluaran_harian_array[$current_tgl] ?? 0;
+    // Simpan label sumbu x
+    $label_grafik[] = $date->format('d M');
     
-    // Kirim data pengeluaran dan laba bersih riil harian ke grafik
+    // Ambil data nilai terpetakan
+    $omzet_hari_ini       = $omzet_harian_map[$current_tgl] ?? 0;
+    $laba_prod_hari_ini   = $laba_harian_map[$current_tgl] ?? 0;
+    $pengeluaran_hari_ini = $pengeluaran_harian_map[$current_tgl] ?? 0;
+    
+    // Inject ke array data ChartJS
+    $data_grafik_omzet[]       = $omzet_hari_ini;
     $data_grafik_pengeluaran[] = $pengeluaran_hari_ini;
     $data_grafik_laba[]        = $laba_prod_hari_ini - $pengeluaran_hari_ini;
 }
@@ -114,6 +125,7 @@ while ($g = mysqli_fetch_assoc($query_grafik)) {
         --success-gradient: linear-gradient(135deg, #10b981, #065f46);
         --info-gradient: linear-gradient(135deg, #0ea5e9, #0369a1);
         --danger-gradient: linear-gradient(135deg, #f43f5e, #be123c);
+        --warning-gradient: linear-gradient(135deg, #f59e0b, #b45309);
     }
     .card-custom {
         border: none;
@@ -128,6 +140,7 @@ while ($g = mysqli_fetch_assoc($query_grafik)) {
     .gradient-success { background: var(--success-gradient); }
     .gradient-info { background: var(--info-gradient); }
     .gradient-danger { background: var(--danger-gradient); }
+    .gradient-warning { background: var(--warning-gradient); }
     
     .table th {
         font-weight: 600;
@@ -175,16 +188,16 @@ while ($g = mysqli_fetch_assoc($query_grafik)) {
     </div>
 
     <!-- Blok Tampilan Utama Stat Cards -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-6 col-xl-3">
+    <div class="row row-cols-1 row-cols-md-3 row-cols-xl-5 g-3 mb-4">
+        <div class="col">
             <div class="card card-custom shadow-sm text-white gradient-info p-3 h-100 d-flex flex-column justify-content-between">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Total Omzet (Bruto)</span>
-                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.6rem;">Rp <?= number_format($total_omzet, 0, ',', '.'); ?></h2>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.4rem;">Rp <?= number_format($total_omzet, 0, ',', '.'); ?></h2>
                     </div>
-                    <div class="bg-white bg-opacity-15 rounded-4 p-2.5">
-                        <i class="bi bi-wallet2 fs-3 text-white"></i>
+                    <div class="bg-white bg-opacity-15 rounded-4 p-2">
+                        <i class="bi bi-wallet2 fs-4 text-white"></i>
                     </div>
                 </div>
                 <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
@@ -193,53 +206,70 @@ while ($g = mysqli_fetch_assoc($query_grafik)) {
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="col">
             <div class="card card-custom shadow-sm text-white gradient-danger p-3 h-100 d-flex flex-column justify-content-between">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Pengeluaran Operasional</span>
-                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.6rem;">Rp <?= number_format($total_operasional, 0, ',', '.'); ?></h2>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.4rem;">Rp <?= number_format($total_operasional, 0, ',', '.'); ?></h2>
                     </div>
-                    <div class="bg-white bg-opacity-15 rounded-4 p-2.5">
-                        <i class="bi bi-cash-stack fs-3 text-white"></i>
+                    <div class="bg-white bg-opacity-15 rounded-4 p-2">
+                        <i class="bi bi-cash-stack fs-4 text-white"></i>
                     </div>
                 </div>
                 <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
-                    <i class="bi bi-arrow-down-circle me-1"></i> Biaya diluar beban belanja modal
+                    <i class="bi bi-arrow-down-circle me-1"></i> Biaya operasional toko
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="col">
+            <div class="card card-custom shadow-sm text-white gradient-warning p-3 h-100 d-flex flex-column justify-content-between">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Total Belanja Stok</span>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.4rem;">Rp <?= number_format($total_belanja_stok, 0, ',', '.'); ?></h2>
+                    </div>
+                    <div class="bg-white bg-opacity-15 rounded-4 p-2">
+                        <i class="bi bi-cart-check fs-4 text-white"></i>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
+                    <i class="bi bi-archive me-1"></i> Rekap modal / aset baru
+                </div>
+            </div>
+        </div>
+
+        <div class="col">
             <div class="card card-custom shadow-sm text-white gradient-success p-3 h-100 d-flex flex-column justify-content-between">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Laba Bersih Akhir</span>
-                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.6rem;">Rp <?= number_format($total_laba_bersih, 0, ',', '.'); ?></h2>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.4rem;">Rp <?= number_format($total_laba_bersih, 0, ',', '.'); ?></h2>
                     </div>
-                    <div class="bg-white bg-opacity-15 rounded-4 p-2.5">
-                        <i class="bi bi-cash-coin fs-3 text-white"></i>
+                    <div class="bg-white bg-opacity-15 rounded-4 p-2">
+                        <i class="bi bi-cash-coin fs-4 text-white"></i>
                     </div>
                 </div>
                 <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
-                    <i class="bi bi-check-circle-fill me-1"></i> Sudah dipotong HPP & Biaya Toko
+                    <i class="bi bi-check-circle-fill me-1"></i> Bersih dipotong HPP & Biaya
                 </div>
             </div>
         </div>
 
-        <div class="col-md-6 col-xl-3">
+        <div class="col">
             <div class="card card-custom shadow-sm text-white gradient-primary p-3 h-100 d-flex flex-column justify-content-between">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <span class="small text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Volume Transaksi</span>
-                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.6rem;"><?= $total_nota; ?> <span style="font-size: 1rem; font-weight: normal;">Nota</span></h2>
+                        <h2 class="fw-bold mt-2 mb-0" style="font-size: 1.4rem;"><?= $total_nota; ?> <span style="font-size: 0.9rem; font-weight: normal;">Nota</span></h2>
                     </div>
-                    <div class="bg-white bg-opacity-15 rounded-4 p-2.5">
-                        <i class="bi bi-journal-check fs-3 text-white"></i>
+                    <div class="bg-white bg-opacity-15 rounded-4 p-2">
+                        <i class="bi bi-journal-check fs-4 text-white"></i>
                     </div>
                 </div>
                 <div class="mt-3 pt-2 border-top border-white border-opacity-10 small text-white-50">
-                    <i class="bi bi-people-fill me-1"></i> Pelanggan sukses dilayani
+                    <i class="bi bi-people-fill me-1"></i> Pelanggan dilayani
                 </div>
             </div>
         </div>
@@ -251,7 +281,7 @@ while ($g = mysqli_fetch_assoc($query_grafik)) {
             <h5 class="fw-bold text-dark mb-0"><i class="bi bi-bar-chart-line-fill text-primary me-2"></i>Tren Perbandingan Performa Keuangan Harian</h5>
         </div>
         <div class="card-body p-4 pt-0">
-            <?php if(!empty($data_grafik_omzet)): ?>
+            <?php if(!empty($label_grafik)): ?>
                 <div style="height: 330px; position: relative;">
                     <canvas id="chartOmzet"></canvas>
                 </div>
@@ -386,7 +416,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 },
                 scales: {
                     y: {
-                        beginAtZero: false,
+                        beginAtZero: true,
                         grid: { color: '#f8fafc' },
                         ticks: {
                             callback: function(value) { return 'Rp ' + value.toLocaleString('id-ID'); },
