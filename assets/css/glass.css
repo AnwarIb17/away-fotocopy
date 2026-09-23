@@ -1,71 +1,83 @@
-/* Glassmorphism theme — 1 file untuk seluruh POS. ponytail: ceiling = light-glass di atas gradient mesh; upgrade = dark-mode toggle + token CSS per-warna bila butuh. */
+/* Glassmorphism theme — Slate profesional. ponytail: ceiling = light-glass netral; upgrade = dark-mode toggle bila butuh. */
 body{
   font-family:'Plus Jakarta Sans',sans-serif;
-  color:#1e293b;
+  color:#0f172a;
   min-height:100vh;
-  background:linear-gradient(135deg,#667eea 0%,#764ba2 35%,#0ea5e9 75%,#38bdf8 100%);
+  background:linear-gradient(180deg,#f8fafc 0%,#f1f5f9 50%,#e2e8f0 100%);
   background-attachment:fixed;
 }
 body::before{
   content:"";position:fixed;inset:0;z-index:-1;
   background:
-    radial-gradient(600px 400px at 10% 10%,rgba(255,255,255,.35),transparent 60%),
-    radial-gradient(700px 500px at 90% 20%,rgba(240,171,252,.5),transparent 60%),
-    radial-gradient(800px 600px at 50% 100%,rgba(45,212,191,.4),transparent 60%);
+    radial-gradient(800px 500px at 15% 0%,rgba(148,163,184,.22),transparent 60%),
+    radial-gradient(700px 500px at 90% 10%,rgba(203,213,225,.45),transparent 60%),
+    radial-gradient(900px 600px at 50% 100%,rgba(226,232,240,.7),transparent 60%);
 }
 main{position:relative;z-index:1}
 
-/* Navbar: dark frosted */
-.navbar{background:rgba(15,23,42,.55)!important;backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);border-bottom:1px solid rgba(255,255,255,.18)}
-.nav-link{color:rgba(255,255,255,.7)!important}
-.nav-link:hover{color:#fff!important;background:rgba(255,255,255,.12)}
-.nav-link.active{color:#7dd3fc!important;background:rgba(255,255,255,.14)!important}
+/* Navbar: putih frosted, teks gelap */
+.navbar{background:rgba(255,255,255,.8)!important;backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border-bottom:1px solid rgba(15,23,42,.08)}
+.navbar-brand{color:#0f172a!important}
+.nav-link{color:#475569!important}
+.nav-link:hover{color:#0f172a!important;background:rgba(15,23,42,.06)}
+.nav-link.active{color:#0f172a!important;background:rgba(15,23,42,.08)!important}
+.nav-link.text-danger{color:#dc2626!important}
 
-/* Cards: light frosted — override bg-white; panel kasir bg-dark dibiarkan */
+/* Cards: putih frosted tenang */
 .card,.card-dashboard,.card-custom,.cart-card{
-  background:rgba(255,255,255,.55)!important;
-  backdrop-filter:blur(20px) saturate(170%);
-  -webkit-backdrop-filter:blur(20px) saturate(170%);
-  border:1px solid rgba(255,255,255,.65)!important;
-  border-radius:18px!important;
-  box-shadow:0 8px 32px rgba(31,38,135,.18)!important;
+  background:rgba(255,255,255,.78)!important;
+  backdrop-filter:blur(16px) saturate(150%);
+  -webkit-backdrop-filter:blur(16px) saturate(150%);
+  border:1px solid rgba(15,23,42,.08)!important;
+  border-radius:14px!important;
+  box-shadow:0 1px 3px rgba(15,23,42,.06),0 4px 16px rgba(15,23,42,.05)!important;
 }
-.login-card{background:rgba(255,255,255,.62)!important;backdrop-filter:blur(20px) saturate(170%);-webkit-backdrop-filter:blur(20px) saturate(170%);border:1px solid rgba(255,255,255,.65)!important;border-radius:18px!important;box-shadow:0 8px 32px rgba(31,38,135,.2)!important}
-.cart-card.bg-dark,.card.bg-dark{background:rgba(15,23,42,.62)!important;backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);border:1px solid rgba(255,255,255,.18)!important}
-.card-dashboard:hover{transform:translateY(-4px)}
-.card-header,.card-footer{background:transparent!important;border-color:rgba(15,23,42,.08)!important}
-.text-white-50{color:rgba(255,255,255,.8)!important}
+.login-card{background:rgba(255,255,255,.82)!important;backdrop-filter:blur(16px) saturate(150%);-webkit-backdrop-filter:blur(16px) saturate(150%);border:1px solid rgba(15,23,42,.08)!important;border-radius:14px!important;box-shadow:0 1px 3px rgba(15,23,42,.06),0 8px 32px rgba(15,23,42,.08)!important}
+/* 2 aksen gelap dipertahankan: banner hero + panel kasir */
+.cart-card.bg-dark,.card.bg-dark{background:rgba(15,23,42,.92)!important;backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(15,23,42,.2)!important;color:#f8fafc!important}
+.card-dashboard:hover{transform:translateY(-3px)}
+.card-header,.card-footer{background:transparent!important;border-color:rgba(15,23,42,.07)!important}
 
-/* Gradient stat cards tetap nge-glass */
-[style*="var(--"],[style*="linear-gradient"]{border:1px solid rgba(255,255,255,.4)!important}
+/* Stat cards warna-warni → putih tenang + ikon chip abu (pertahankan kode warna via badge) */
+.gradient-primary,.gradient-success,.gradient-info,.gradient-danger,.gradient-warning,
+.card[style*="var(--emerald"],.card[style*="var(--sky"],.card[style*="var(--rose"],.card[style*="var(--indigo"],.card[style*="var(--amber"]{
+  background:rgba(255,255,255,.78)!important;color:#0f172a!important;border:1px solid rgba(15,23,42,.08)!important;
+}
+.gradient-primary *, .gradient-success *, .gradient-info *, .gradient-danger *, .gradient-warning *{color:#0f172a!important}
+.gradient-primary .text-white-50,.gradient-success .text-white-50,.gradient-info .text-white-50,.gradient-danger .text-white-50,.gradient-warning .text-white-50,
+.card[style*="var(--"] .text-white-50{color:#64748b!important}
+.gradient-primary .bg-white,.gradient-success .bg-white,.gradient-info .bg-white,.gradient-danger .bg-white,.gradient-warning .bg-white{background:rgba(15,23,42,.06)!important}
+.gradient-primary .border-white,.gradient-success .border-white,.gradient-info .border-white,.gradient-danger .border-white,.gradient-warning .border-white{border-color:rgba(15,23,42,.08)!important}
 
 /* Tables */
 .table{--bs-table-bg:transparent}
-.table thead th{background:rgba(255,255,255,.45)!important;border-bottom:1px solid rgba(255,255,255,.5)!important}
-.table tbody tr{border-bottom:1px solid rgba(15,23,42,.06)!important}
-.table tbody tr:hover{background:rgba(255,255,255,.45)!important}
+.table thead th{background:rgba(248,250,252,.9)!important;border-bottom:1px solid rgba(15,23,42,.08)!important;color:#64748b!important}
+.table tbody tr{border-bottom:1px solid rgba(15,23,42,.05)!important}
+.table tbody tr:hover{background:rgba(15,23,42,.02)!important}
 
 /* Forms */
-.form-control,.form-select{background:rgba(255,255,255,.75)!important;border:1px solid rgba(255,255,255,.7)!important;backdrop-filter:blur(8px)}
-.form-control:focus,.form-select:focus{background:rgba(255,255,255,.95)!important;border-color:#38bdf8;box-shadow:0 0 0 .25rem rgba(56,189,248,.25)}
-.input-group-text{background:rgba(255,255,255,.6)!important;border:1px solid rgba(255,255,255,.6)!important;backdrop-filter:blur(8px)}
+.form-control,.form-select{background:rgba(255,255,255,.9)!important;border:1px solid #e2e8f0!important;backdrop-filter:blur(8px)}
+.form-control:focus,.form-select:focus{background:#fff!important;border-color:#64748b;box-shadow:0 0 0 .2rem rgba(15,23,42,.08)}
+.input-group-text{background:#f8fafc!important;border:1px solid #e2e8f0!important;color:#64748b!important}
 
 /* Modals, dropdowns, search results */
-.modal-content{background:rgba(255,255,255,.78)!important;backdrop-filter:blur(24px) saturate(170%);border:1px solid rgba(255,255,255,.6)!important;border-radius:20px!important}
-.search-results{background:rgba(255,255,255,.85);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.6)}
-.list-group-item{background:rgba(255,255,255,.7)!important}
+.modal-content{background:rgba(255,255,255,.92)!important;backdrop-filter:blur(24px);border:1px solid rgba(15,23,42,.08)!important;border-radius:14px!important}
+.search-results{background:rgba(255,255,255,.96);backdrop-filter:blur(20px);border:1px solid rgba(15,23,42,.1)}
+.list-group-item{background:rgba(255,255,255,.9)!important}
 
-/* Buttons: kaca + gradient tetap */
+/* Buttons: solid slate, tanpa gradien menyala */
 .btn{backdrop-filter:blur(6px)}
-.btn-primary{background:linear-gradient(135deg,rgba(99,102,241,.9),rgba(59,130,246,.9))!important;border:1px solid rgba(255,255,255,.35)!important}
-.quick-link-btn{background:rgba(255,255,255,.5)!important;border:1px solid rgba(255,255,255,.6)!important}
-.quick-link-btn:hover{background:rgba(255,255,255,.85)!important}
+.btn-primary{background:#0f172a!important;border:1px solid #0f172a!important}
+.btn-primary:hover{background:#1e293b!important;border-color:#1e293b!important}
+.btn-info{background:#e2e8f0!important;border-color:#e2e8f0!important;color:#0f172a!important}
+.quick-link-btn{background:rgba(255,255,255,.6)!important;border:1px solid rgba(15,23,42,.08)!important}
+.quick-link-btn:hover{background:#fff!important;border-color:#cbd5e1!important}
 
 /* Footer */
-.footer{background:rgba(255,255,255,.4)!important;backdrop-filter:blur(16px);border-top:1px solid rgba(255,255,255,.5)!important}
+.footer{background:rgba(255,255,255,.7)!important;backdrop-filter:blur(16px);border-top:1px solid rgba(15,23,42,.07)!important}
 
-/* Alerts & badges di atas kaca */
-.alert{backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.5)}
+/* Alerts & badges */
+.alert{backdrop-filter:blur(12px);border:1px solid rgba(15,23,42,.08)}
 
 /* Mobile cart item */
-.mobile-cart-item{background:rgba(255,255,255,.65)!important;backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.6)!important}
+.mobile-cart-item{background:rgba(255,255,255,.85)!important;backdrop-filter:blur(14px);border:1px solid rgba(15,23,42,.08)!important}

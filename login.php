@@ -40,7 +40,7 @@ if (isset($_POST['submit_login'])) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="assets/css/glass.css" rel="stylesheet">
+    <link href="assets/css/glass.css?v=slate2" rel="stylesheet">
     <style>body{display:flex;align-items:center;justify-content:center;min-height:100vh}.login-card{width:100%;max-width:400px;padding:30px}</style>
 </head>
 <body>

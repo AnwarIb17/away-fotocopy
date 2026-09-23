@@ -21,38 +21,11 @@ if (!isset($_SESSION['login']) || $_SESSION['login'] !== true) {
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-    <style>
-        body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: #f4f7fa;
-            color: #334155;
-        }
-        .navbar {
-            background-color: #0f172a !important;
-        }
-        .nav-link {
-            font-weight: 500;
-            color: #94a3b8 !important;
-            transition: all 0.2s ease;
-            border-radius: 8px;
-            padding: 8px 16px !important;
-        }
-        .nav-link:hover {
-            color: #f1f5f9 !important;
-            background-color: #1e293b;
-        }
-        .nav-link.active {
-            color: #38bdf8 !important;
-            background-color: #1e293b;
-            font-weight: 600;
-        }
-    </style>
-    <link href="assets/css/glass.css" rel="stylesheet">
+    <link href="assets/css/glass.css?v=slate2" rel="stylesheet">
 </head>
 <body>
 
-<nav class="navbar navbar-expand-lg navbar-dark sticky-top shadow-sm py-2">
+<nav class="navbar navbar-expand-lg sticky-top shadow-sm py-2">
     <div class="container-fluid px-4">
         <a class="navbar-brand fw-bold text-info fs-4 d-flex align-items-center" href="index.php">
             <img src="assets/img/logo.png" alt="Logo" width="35" height="35" class="d-inline-block align-top me-2 rounded-2" style="object-fit: cover;">
